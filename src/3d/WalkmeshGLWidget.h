@@ -18,10 +18,23 @@
 #pragma once
 
 #include <QtWidgets>
+
+#ifndef NO_OPENGL_WIDGETS
+#include <QOpenGLWidget>
+#include <QOpenGLTexture>
+#include <QOpenGLBuffer>
+#include <QOpenGLShaderProgram>
+#include <QOpenGLFunctions>
+#endif
+
 #include "Field.h"
 #include "Renderer.h"
 
-class WalkmeshGLWidget : public QOpenGLWidget
+#ifndef NO_OPENGL_WIDGETS
+class WalkmeshGLWidget : public QOpenGLWidget, protected QOpenGLFunctions
+#else
+class WalkmeshGLWidget : public QWidget
+#endif
 {
 	Q_OBJECT
 public:
@@ -43,6 +56,11 @@ public slots:
 	void setSelectedGate(int gate);
 	void setLineToDraw(const Vertex vertex[2]);
 	void clearLineToDraw();
+	QImage grabFramebuffer()
+	{
+		return this->tex;
+	}
+
 private:
 	void computeFov();
 	void drawBackground();
@@ -67,9 +85,14 @@ private:
 
 protected:
 	virtual void timerEvent(QTimerEvent *event) override;
+#ifndef NO_OPENGL_WIDGETS
 	virtual void initializeGL() override;
 	virtual void resizeGL(int w, int h) override;
 	virtual void paintGL() override;
+#else
+	virtual void paintEvent(QPaintEvent *event) override;
+	virtual void resizeEvent(QResizeEvent *event) override;
+#endif
 	virtual void wheelEvent(QWheelEvent *event) override;
 	virtual void mousePressEvent(QMouseEvent *event) override;
 	virtual void mouseMoveEvent(QMouseEvent *event) override;

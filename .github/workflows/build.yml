@@ -1,6 +1,7 @@
 name: CI/CD
 
 on:
+  workflow_dispatch:
   push:
     branches: [ master ]
   pull_request:
@@ -49,13 +50,14 @@ jobs:
           package_suffix: 'win_x64'
           win_arch: "x64"
           qt_arch: win64_msvc2022_64
-          qt_tools: tools_ninja, tools_cmake
+          qt_tools: tools_ninja tools_cmake
         - os: windows-11-arm
           package_extension: 'zip'
           package_suffix: 'win_arm64'
           win_arch: "arm64"
           qt_arch: win64_msvc2022_arm64
-          qt_tools: tools_ninja, tools_cmake
+          qt_tools: tools_ninja tools_cmake
+          qt_modules: qtshadertools
         - interface: gui
           cmake_cli_arg: 'OFF'
           cmake_gui_arg: 'ON'

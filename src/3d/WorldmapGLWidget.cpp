@@ -17,16 +17,32 @@
  ****************************************************************************/
 #include "WorldmapGLWidget.h"
 
-WorldmapGLWidget::WorldmapGLWidget(QWidget *parent,
-                                   Qt::WindowFlags f) :
-    QOpenGLWidget(parent, f), _map(nullptr),
-    _distance(-0.714248f), _xRot(-90.0f), _yRot(180.0f), _zRot(180.0f),
-    _xTrans(-0.5f), _yTrans(0.5f), _transStep(360.0f), _lastKeyPressed(-1),
-    _texture(-1), _segmentGroupId(-1), _segmentId(-1), _blockId(-1),
-    _groundType(-1), _polyId(-1), _clutId(-1), _limits(QRect(0, 0, 32, 24)),
-    _megaTexture(nullptr), gpuRenderer(nullptr), _segmentFiltering(Map::NoFiltering)
+#ifndef NO_OPENGL_WIDGETS
+#include <QPainter>
+#endif
+
+WorldmapGLWidget::WorldmapGLWidget(QWidget *parent, Qt::WindowFlags f)
+    :
+#ifndef NO_OPENGL_WIDGETS
+      QOpenGLWidget(parent, f),
+#else
+      QWidget(parent, f),
+#endif
+      _map(nullptr), _distance(-0.714248f), _xRot(-90.0f), _yRot(180.0f),
+      _zRot(180.0f), _xTrans(-0.5f), _yTrans(0.5f), _transStep(360.0f),
+      _lastKeyPressed(-1), _texture(-1), _segmentGroupId(-1), _segmentId(-1),
+      _blockId(-1), _groundType(-1), _polyId(-1), _clutId(-1),
+      _limits(QRect(0, 0, 32, 24)),
+#ifndef NO_OPENGL_WIDGETS
+      _megaTexture(nullptr), program(nullptr),
+#endif
+      gpuRenderer(nullptr), _segmentFiltering(Map::NoFiltering)
 {
 	setMouseTracking(true);
+#ifdef NO_OPENGL_WIDGETS
+	// For non-OpenGL builds, we need keyboard focus
+	setFocusPolicy(Qt::StrongFocus);
+#endif
 }
 
 WorldmapGLWidget::~WorldmapGLWidget()
@@ -35,12 +51,14 @@ WorldmapGLWidget::~WorldmapGLWidget()
 		delete gpuRenderer;
 	}
 
+#ifndef NO_OPENGL_WIDGETS
 	makeCurrent();
 	buf.destroy();
-	
+
 	if (_megaTexture) {
 		delete _megaTexture;
 	}
+#endif
 }
 
 void WorldmapGLWidget::resetCamera()
@@ -147,26 +165,41 @@ void WorldmapGLWidget::setClutId(int clutId)
 void WorldmapGLWidget::setSegmentFiltering(Map::SegmentFiltering filtering)
 {
 	_segmentFiltering = filtering;
-	
+
 	importVertices();
 	update();
 }
 
 void WorldmapGLWidget::dumpCurrent()
 {
-	const MapPoly &poly = _map->segments().at(_segmentId).blocks().at(_blockId).polygons().at(_polyId);
-	qDebug() << QString::number(poly.flags1(), 16) << QString::number(poly.flags2(), 16)
-	         << poly.groundType() << "texPage" << poly.texPage() << "clutId" << poly.clutId() << "hasTexture" << poly.hasTexture() << "isMonochrome" << poly.isMonochrome();
-	for (const TexCoord &coord: poly.texCoords()) {
+	if (!_map || _segmentId < 0 || _blockId < 0 || _polyId < 0) {
+		return;
+	}
+
+	const MapPoly &poly = _map->segments()
+	                          .at(_segmentId)
+	                          .blocks()
+	                          .at(_blockId)
+	                          .polygons()
+	                          .at(_polyId);
+	qDebug() << QString::number(poly.flags1(), 16)
+	         << QString::number(poly.flags2(), 16) << poly.groundType()
+	         << "texPage" << poly.texPage() << "clutId" << poly.clutId()
+	         << "hasTexture" << poly.hasTexture() << "isMonochrome"
+	         << poly.isMonochrome();
+	for (const TexCoord &coord : poly.texCoords()) {
 		qDebug() << "texcoord" << coord.x << coord.y;
-	}	
-	for (const Vertex &vertex: poly.vertices()) {
+	}
+	for (const Vertex &vertex : poly.vertices()) {
 		qDebug() << "vertex" << vertex.x << vertex.y << vertex.z;
 	}
 }
 
+#ifndef NO_OPENGL_WIDGETS
 void WorldmapGLWidget::initializeGL()
 {
+	initializeOpenGLFunctions();
+
 	if (gpuRenderer == nullptr) {
 		gpuRenderer = new Renderer(this);
 		importVertices();
@@ -187,13 +220,19 @@ static QOpenGLTexture *textureFromImage(const QImage &image)
 
 	return texture;
 }
+#endif
 
 void WorldmapGLWidget::importVertices()
 {
-	if (nullptr == _map || gpuRenderer == nullptr) {
+	if (nullptr == _map) {
 		return;
 	}
-	
+
+#ifndef NO_OPENGL_WIDGETS
+	if (gpuRenderer == nullptr) {
+		return;
+	}
+
 	QImage megaImage = _map->megaImage();
 	if (_megaTexture) {
 		delete _megaTexture;
@@ -201,10 +240,16 @@ void WorldmapGLWidget::importVertices()
 	_megaTexture = textureFromImage(megaImage);
 
 	const int segmentPerLine = 32, blocksPerLine = 4,
-	        diffSize = _limits.width() - _limits.height();
-	const float scaleVect = 2048.0f, scaleTexX = float(_megaTexture->width() - 1), scaleTexY = float(_megaTexture->height() - 1), scale = _limits.width() * blocksPerLine;
-	const float xShift = -_limits.x() * blocksPerLine + (diffSize < 0 ? -diffSize : 0) * blocksPerLine / 2.0f;
-	const float zShift = -_limits.y() * blocksPerLine + (diffSize > 0 ? diffSize : 0) * blocksPerLine / 2.0f;
+	          diffSize = _limits.width() - _limits.height();
+	const float scaleVect = 2048.0f,
+	            scaleTexX = float(_megaTexture->width() - 1),
+	            scaleTexY = float(_megaTexture->height() - 1),
+	            scale = _limits.width() * blocksPerLine;
+	const float xShift =
+	    -_limits.x() * blocksPerLine
+	    + (diffSize < 0 ? -diffSize : 0) * blocksPerLine / 2.0f;
+	const float zShift = -_limits.y() * blocksPerLine
+	                     + (diffSize > 0 ? diffSize : 0) * blocksPerLine / 2.0f;
 	int xs = 0, ys = 0;
 
 	QList<MapSegment> segments = _map->segments(_segmentFiltering);
@@ -213,24 +258,27 @@ void WorldmapGLWidget::importVertices()
 		int xb = 0, yb = 0;
 		foreach (const MapBlock &block, segment.blocks()) {
 			foreach (const MapPoly &poly, block.polygons()) {
-				const int x = xs * blocksPerLine + xb, z = ys * blocksPerLine + yb;
+				const int x = xs * blocksPerLine + xb,
+				          z = ys * blocksPerLine + yb;
 
 				if (poly.vertices().size() != 3) {
-					qWarning() << "Wrong vertices size" << poly.vertices().size();
+					qWarning()
+					    << "Wrong vertices size" << poly.vertices().size();
 					return;
 				}
-				
-				const int pageX = poly.texPage() / 5, pageY = poly.texPage() % 5;
+
+				const int pageX = poly.texPage() / 5,
+				          pageY = poly.texPage() % 5;
 
 				for (quint8 i = 0; i < 3; ++i) {
 					const Vertex &v = poly.vertex(i);
 					const TexCoord &tc = poly.texCoord(i);
-					
+
 					QVector3D position((xShift + x + v.x / scaleVect) / scale,
 					                   normalizeY(v.y) / scaleVect / scale,
 					                   (zShift + z - v.z / scaleVect) / scale);
 					QVector2D texcoord;
-					
+
 					if (poly.isRoadTexture()) {
 						texcoord.setX((4 * 256 + tc.x) / scaleTexX);
 						texcoord.setY((1 * 256 + tc.y) / scaleTexY);
@@ -260,8 +308,13 @@ void WorldmapGLWidget::importVertices()
 			ys += 1;
 		}
 	}
+#else
+	// For non-OpenGL builds, just store the mega image
+	_megaImage = _map->megaImage();
+#endif
 }
 
+#ifndef NO_OPENGL_WIDGETS
 void WorldmapGLWidget::resizeGL(int width, int height)
 {
 	if (gpuRenderer != nullptr) {
@@ -269,14 +322,17 @@ void WorldmapGLWidget::resizeGL(int width, int height)
 	}
 
 	_matrixProj.setToIdentity();
-	_matrixProj.perspective(70.0f, GLfloat(width) / GLfloat(height), 0.000001f, 1000.0f);
+	_matrixProj.perspective(70.0f, GLfloat(width) / GLfloat(height), 0.000001f,
+	                        1000.0f);
 }
 
 void WorldmapGLWidget::paintGL()
 {
-	gpuRenderer->clear();
+	if (gpuRenderer) {
+		gpuRenderer->clear();
+	}
 
-	if (nullptr == _map || gpuRenderer->hasError()) {
+	if (nullptr == _map || !gpuRenderer || gpuRenderer->hasError()) {
 		return;
 	}
 	gpuRenderer->bindProjectionMatrix(_matrixProj);
@@ -286,13 +342,13 @@ void WorldmapGLWidget::paintGL()
 	} else if (_distance < -1.78358f) {
 		_distance = -1.78358f;
 	}
-	
+
 	if (_xTrans > 0.0115338f) {
 		_xTrans = 0.0115338f;
 	} else if (_xTrans < -1.01512f) {
 		_xTrans = -1.01512f;
 	}
-	
+
 	if (_yTrans < 0.116807f) {
 		_yTrans = 0.116807f;
 	} else if (_yTrans > 0.892654f) {
@@ -304,15 +360,61 @@ void WorldmapGLWidget::paintGL()
 	mModel.rotate(_xRot, 1.0f, 0.0f, 0.0f);
 	mModel.rotate(_yRot, 0.0f, 1.0f, 0.0f);
 	mModel.rotate(_zRot, 0.0f, 0.0f, 1.0f);
-	
+
 	QMatrix4x4 mView;
 
 	gpuRenderer->bindModelMatrix(mModel);
 	gpuRenderer->bindViewMatrix(mView);
 	gpuRenderer->bindTexture(_megaTexture);
-	
+
 	gpuRenderer->draw(RendererPrimitiveType::PT_TRIANGLES, 1.0f, false);
 }
+#else
+void WorldmapGLWidget::resizeEvent(QResizeEvent *event)
+{
+	QWidget::resizeEvent(event);
+	update();
+}
+
+void WorldmapGLWidget::paintEvent(QPaintEvent *event)
+{
+	QPainter painter(this);
+	painter.fillRect(rect(), Qt::black);
+
+	if (!_map || _megaImage.isNull()) {
+		painter.setPen(Qt::white);
+		painter.drawText(rect(), Qt::AlignCenter,
+		                 tr("OpenGL not available\nWorldmap view disabled"));
+		return;
+	}
+
+	// Simple 2D fallback
+	QRect targetRect = rect();
+	QRect sourceRect = _megaImage.rect();
+
+	// Apply basic zoom/pan transformation
+	float zoom = 1.0f + _distance;
+	if (zoom < 0.1f)
+		zoom = 0.1f;
+	if (zoom > 10.0f)
+		zoom = 10.0f;
+
+	int w = int(targetRect.width() / zoom);
+	int h = int(targetRect.height() / zoom);
+	int x = int(_xTrans * targetRect.width()) + (targetRect.width() - w) / 2;
+	int y = int(_yTrans * targetRect.height()) + (targetRect.height() - h) / 2;
+
+	QRect scaledRect(x, y, w, h);
+
+	painter.setRenderHint(QPainter::SmoothPixmapTransform, false);
+	painter.drawImage(scaledRect, _megaImage, sourceRect);
+
+	// Draw info overlay
+	painter.setPen(Qt::yellow);
+	painter.drawText(10, 20, tr("2D Fallback Mode (OpenGL disabled)"));
+	painter.drawText(10, 40, tr("Limited functionality available"));
+}
+#endif
 
 void WorldmapGLWidget::wheelEvent(QWheelEvent *event)
 {
@@ -346,7 +448,7 @@ void WorldmapGLWidget::mouseMoveEvent(QMouseEvent *event)
 
 	QPointF diff = event->position() - _moveStart;
 	bool toUpdate = false;
-	
+
 	if (abs(diff.x()) >= 4.0f) {
 		_xTrans += (diff.x() > 0.0f ? 1.0f : -1.0f) / 360.0f;
 		toUpdate = true;
@@ -362,12 +464,10 @@ void WorldmapGLWidget::mouseMoveEvent(QMouseEvent *event)
 
 void WorldmapGLWidget::keyPressEvent(QKeyEvent *event)
 {
-	if(_lastKeyPressed == event->key()
-	        && (event->key() == Qt::Key_Left
-	            || event->key() == Qt::Key_Right
-	            || event->key() == Qt::Key_Down
-	            || event->key() == Qt::Key_Up)) {
-		if(_transStep > 100.0f) {
+	if (_lastKeyPressed == event->key()
+	    && (event->key() == Qt::Key_Left || event->key() == Qt::Key_Right
+	        || event->key() == Qt::Key_Down || event->key() == Qt::Key_Up)) {
+		if (_transStep > 100.0f) {
 			_transStep *= 0.90f; // accelerator
 		}
 	} else {
@@ -375,8 +475,7 @@ void WorldmapGLWidget::keyPressEvent(QKeyEvent *event)
 	}
 	_lastKeyPressed = event->key();
 
-	switch(event->key())
-	{
+	switch (event->key()) {
 	case Qt::Key_Left:
 		_xTrans += 1.0f / _transStep;
 		update();
@@ -433,4 +532,15 @@ void WorldmapGLWidget::focusOutEvent(QFocusEvent *event)
 {
 	releaseKeyboard();
 	QWidget::focusOutEvent(event);
+}
+
+QRgb WorldmapGLWidget::groundColor(quint8 groundType, quint8 region,
+                                   const QSet<quint8> &grounds)
+{
+	Q_UNUSED(groundType)
+	Q_UNUSED(region)
+	Q_UNUSED(grounds)
+
+	// Placeholder implementation
+	return qRgb(255, 255, 255);
 }

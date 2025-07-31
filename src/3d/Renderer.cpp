@@ -18,20 +18,24 @@
  ****************************************************************************/
 
 #include "Renderer.h"
+#include <QDebug>
 
+#ifndef NO_OPENGL_WIDGETS
 // Get the size of a vector in bytes
-template<typename T>
-size_t vectorSizeOf(const typename std::vector<T>& vec)
+template <typename T> size_t vectorSizeOf(const typename std::vector<T> &vec)
 {
-  return sizeof(T) * vec.size();
+	return sizeof(T) * vec.size();
 }
 
-Renderer::Renderer(QOpenGLWidget *_widget) :
-    mProgram(_widget), mVertexShader(QOpenGLShader::Vertex, _widget), mFragmentShader(QOpenGLShader::Fragment, _widget),
-    mVAO(this), mVertex(QOpenGLBuffer::VertexBuffer), mIndex(QOpenGLBuffer::IndexBuffer),
-    mTexture(QOpenGLTexture::Target2D), _hasError(false), _buffersHaveChanged(true)
+Renderer::Renderer(QOpenGLWidget *_widget)
+    : mProgram(_widget), mVertexShader(QOpenGLShader::Vertex, _widget),
+      mFragmentShader(QOpenGLShader::Fragment, _widget), mVAO(this),
+      mVertex(QOpenGLBuffer::VertexBuffer), mIndex(QOpenGLBuffer::IndexBuffer),
+      mTexture(QOpenGLTexture::Target2D), _hasError(false),
+      _buffersHaveChanged(true)
 #ifdef QT_DEBUG
-    , mLogger(_widget)
+      ,
+      mLogger(_widget)
 #endif
 {
 	mWidget = _widget;
@@ -39,14 +43,17 @@ Renderer::Renderer(QOpenGLWidget *_widget) :
 	mGL.initializeOpenGLFunctions();
 
 #ifdef QT_DEBUG
-	connect(&mLogger, SIGNAL(messageLogged(QOpenGLDebugMessage)), this, SLOT(messageLogged(QOpenGLDebugMessage)));
+	connect(&mLogger, SIGNAL(messageLogged(QOpenGLDebugMessage)), this,
+	        SLOT(messageLogged(QOpenGLDebugMessage)));
 
 	if (mLogger.initialize()) {
 		mLogger.startLogging();
 	} else {
 		qWarning() << "Cannot initialize OpenGL Debug Logger";
-		if (!QOpenGLContext::currentContext()->hasExtension(QByteArrayLiteral("GL_KHR_debug"))) {
-			qWarning() << "GL_KHR_debug extension is not available in this context";
+		if (!QOpenGLContext::currentContext()->hasExtension(
+		        QByteArrayLiteral("GL_KHR_debug"))) {
+			qWarning()
+			    << "GL_KHR_debug extension is not available in this context";
 		}
 	}
 #endif
@@ -56,14 +63,16 @@ Renderer::Renderer(QOpenGLWidget *_widget) :
 		_hasError = true;
 	}
 	if (!mVertexShader.log().isEmpty()) {
-		qWarning() << "Warning during main.vert compilation" << mVertexShader.log();
+		qWarning() << "Warning during main.vert compilation"
+		           << mVertexShader.log();
 	}
 	if (!mFragmentShader.compileSourceFile(":/shaders/main.frag")) {
 		qWarning() << "Cannot compile main.frag";
 		_hasError = true;
 	}
 	if (!mFragmentShader.log().isEmpty()) {
-		qWarning() << "Warning during main.frag compilation" << mFragmentShader.log();
+		qWarning() << "Warning during main.frag compilation"
+		           << mFragmentShader.log();
 	}
 
 	if (!mProgram.addShader(&mVertexShader)) {
@@ -75,9 +84,11 @@ Renderer::Renderer(QOpenGLWidget *_widget) :
 		_hasError = true;
 	}
 
-	mProgram.bindAttributeLocation("a_position", ShaderProgramAttributes::POSITION);
+	mProgram.bindAttributeLocation("a_position",
+	                               ShaderProgramAttributes::POSITION);
 	mProgram.bindAttributeLocation("a_color", ShaderProgramAttributes::COLOR);
-	mProgram.bindAttributeLocation("a_texcoord", ShaderProgramAttributes::TEXCOORD);
+	mProgram.bindAttributeLocation("a_texcoord",
+	                               ShaderProgramAttributes::TEXCOORD);
 
 	if (!mProgram.link()) {
 		qWarning() << "Cannot link the program" << mProgram.log();
@@ -98,7 +109,7 @@ Renderer::Renderer(QOpenGLWidget *_widget) :
 	mGL.glDisable(GL_CULL_FACE);
 
 	mGL.glDisable(GL_BLEND);
-	
+
 	// Vertex Array Object
 	if (!mVAO.isCreated() && !mVAO.create()) {
 #ifdef QT_DEBUG
@@ -107,12 +118,26 @@ Renderer::Renderer(QOpenGLWidget *_widget) :
 		return;
 	}
 }
+#else
+// Non-OpenGL implementation
+Renderer::Renderer(QWidget *_widget)
+    : _hasError(false), _buffersHaveChanged(true)
+{
+	mWidget = _widget;
+	// No OpenGL initialization needed
+	qDebug() << "Renderer created in fallback mode (OpenGL disabled)";
+}
+#endif
 
 void Renderer::clear()
 {
+#ifndef NO_OPENGL_WIDGETS
 	mGL.glClearColor(0, 0, 0, 0);
 	mGL.glClearDepthf(1.0f);
 	mGL.glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+#else
+	// No-op for non-OpenGL builds
+#endif
 }
 
 void Renderer::show()
@@ -127,6 +152,7 @@ void Renderer::reset()
 	mModelMatrix.setToIdentity();
 }
 
+#ifndef NO_OPENGL_WIDGETS
 bool Renderer::updateBuffers()
 {
 	// --- Before Draw ---
@@ -143,22 +169,28 @@ bool Renderer::updateBuffers()
 
 	if (!mVertex.bind()) {
 #ifdef QT_DEBUG
-		qWarning() << "QOpenGLBuffer bind type not supported (mVertex)" << mVertex.type();
+		qWarning() << "QOpenGLBuffer bind type not supported (mVertex)"
+		           << mVertex.type();
 #endif
 		return false;
 	}
 
 	if (_buffersHaveChanged) {
-		mVertex.allocate(mVertexBuffer.data(), int(vectorSizeOf(mVertexBuffer)));
+		mVertex.allocate(mVertexBuffer.data(),
+		                 int(vectorSizeOf(mVertexBuffer)));
 	}
 
 	mProgram.enableAttributeArray(ShaderProgramAttributes::POSITION);
 	mProgram.enableAttributeArray(ShaderProgramAttributes::COLOR);
 	mProgram.enableAttributeArray(ShaderProgramAttributes::TEXCOORD);
-	
-	mProgram.setAttributeBuffer(ShaderProgramAttributes::POSITION, GL_FLOAT, 0, 4, sizeof(RendererVertex));
-	mProgram.setAttributeBuffer(ShaderProgramAttributes::COLOR, GL_FLOAT, 4 * sizeof(GLfloat), 4, sizeof(RendererVertex));
-	mProgram.setAttributeBuffer(ShaderProgramAttributes::TEXCOORD, GL_FLOAT, (4 * sizeof(GLfloat)) + (4 * sizeof(GLfloat)), 2, sizeof(RendererVertex));
+
+	mProgram.setAttributeBuffer(ShaderProgramAttributes::POSITION, GL_FLOAT, 0,
+	                            4, sizeof(RendererVertex));
+	mProgram.setAttributeBuffer(ShaderProgramAttributes::COLOR, GL_FLOAT,
+	                            4 * sizeof(GLfloat), 4, sizeof(RendererVertex));
+	mProgram.setAttributeBuffer(ShaderProgramAttributes::TEXCOORD, GL_FLOAT,
+	                            (4 * sizeof(GLfloat)) + (4 * sizeof(GLfloat)),
+	                            2, sizeof(RendererVertex));
 
 	// Index Buffer
 	if (mIndexBuffer.empty()) {
@@ -177,16 +209,17 @@ bool Renderer::updateBuffers()
 
 	if (!mIndex.bind()) {
 #ifdef QT_DEBUG
-		qWarning() << "QOpenGLBuffer bind type not supported (mIndex)" << mIndex.type();
+		qWarning() << "QOpenGLBuffer bind type not supported (mIndex)"
+		           << mIndex.type();
 #endif
 		return false;
 	}
 	if (_buffersHaveChanged) {
 		mIndex.allocate(mIndexBuffer.data(), int(vectorSizeOf(mIndexBuffer)));
 	}
-	
+
 	_buffersHaveChanged = false;
-	
+
 	return true;
 }
 
@@ -195,7 +228,7 @@ void Renderer::drawStart(float _pointSize)
 	// --- Before Draw ---
 	mVAO.bind();
 	mProgram.bind();
-	
+
 	// Set Point Size
 	mProgram.setUniformValue("pointSize", _pointSize);
 
@@ -204,9 +237,11 @@ void Renderer::drawStart(float _pointSize)
 	mProgram.setUniformValue("projectionMatrix", mProjectionMatrix);
 	mProgram.setUniformValue("viewMatrix", mViewMatrix);
 }
+#endif
 
 void Renderer::draw(RendererPrimitiveType _type, float _pointSize, bool clear)
 {
+#ifndef NO_OPENGL_WIDGETS
 	if (!updateBuffers()) {
 		return;
 	}
@@ -214,17 +249,29 @@ void Renderer::draw(RendererPrimitiveType _type, float _pointSize, bool clear)
 	drawStart(_pointSize);
 
 	// --- Draw ---
-	mGL.glDrawElements(GLenum(_type), GLsizei(mIndexBuffer.size()), GL_UNSIGNED_INT, nullptr);
+	mGL.glDrawElements(GLenum(_type), GLsizei(mIndexBuffer.size()),
+	                   GL_UNSIGNED_INT, nullptr);
 #ifdef QT_DEBUG
 	GLenum lastError = mGL.glGetError();
 	if (lastError != GL_NO_ERROR) {
-		qDebug() << "mGL.glDrawElements(_type, mIndexBuffer.size(), GL_UNSIGNED_INT, nullptr)" << lastError << _type << mIndexBuffer.size();
+		qDebug() << "mGL.glDrawElements(_type, mIndexBuffer.size(), "
+		            "GL_UNSIGNED_INT, nullptr)"
+		         << lastError << _type << mIndexBuffer.size();
 	}
 #endif
 
 	drawEnd(clear);
+#else
+	// Fallback: no actual drawing, just clear buffers if requested
+	if (clear) {
+		mVertexBuffer.clear();
+		mIndexBuffer.clear();
+		_buffersHaveChanged = true;
+	}
+#endif
 }
 
+#ifndef NO_OPENGL_WIDGETS
 void Renderer::drawEnd(bool clear)
 {
 	// --- After Draw ---
@@ -235,7 +282,7 @@ void Renderer::drawEnd(bool clear)
 		mIndexBuffer.clear();
 		_buffersHaveChanged = true;
 	}
-	
+
 	if (mTexture.isCreated() && mTexture.isBound()) {
 		mTexture.release();
 	}
@@ -244,10 +291,20 @@ void Renderer::drawEnd(bool clear)
 	mVAO.release();
 	mProgram.release();
 }
+#endif
 
-void Renderer::setViewport(int32_t _x, int32_t _y, int32_t _width, int32_t _height)
+void Renderer::setViewport(int32_t _x, int32_t _y, int32_t _width,
+                           int32_t _height)
 {
+#ifndef NO_OPENGL_WIDGETS
 	mGL.glViewport(_x, _y, _width, _height);
+#else
+	Q_UNUSED(_x)
+	Q_UNUSED(_y)
+	Q_UNUSED(_width)
+	Q_UNUSED(_height)
+	// No-op for non-OpenGL builds
+#endif
 }
 
 void Renderer::bindModelMatrix(QMatrix4x4 _matrix)
@@ -283,6 +340,7 @@ void Renderer::bindIndex(uint32_t *_index, uint32_t _count)
 
 void Renderer::bindTexture(const QImage &_image, bool generateMipmaps)
 {
+#ifndef NO_OPENGL_WIDGETS
 	if (mTexture.isCreated()) {
 		mTexture.destroy();
 	}
@@ -291,44 +349,57 @@ void Renderer::bindTexture(const QImage &_image, bool generateMipmaps)
 	mTexture.setMinificationFilter(QOpenGLTexture::NearestMipMapLinear);
 	mTexture.setMagnificationFilter(QOpenGLTexture::Nearest);
 
-	mTexture.setData(
-		_image,
-		generateMipmaps ? QOpenGLTexture::GenerateMipMaps
-	                  : QOpenGLTexture::DontGenerateMipMaps
-	);
+	mTexture.setData(_image, generateMipmaps
+	                             ? QOpenGLTexture::GenerateMipMaps
+	                             : QOpenGLTexture::DontGenerateMipMaps);
 
 	mTexture.bind();
 
 	mGL.glEnable(GL_BLEND);
 	mGL.glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+#else
+	Q_UNUSED(_image)
+	Q_UNUSED(generateMipmaps)
+	// No-op for non-OpenGL builds
+#endif
 }
 
+#ifndef NO_OPENGL_WIDGETS
 void Renderer::bindTexture(QOpenGLTexture *texture)
 {
 	texture->bind();
-	
+
 	mGL.glEnable(GL_BLEND);
 	mGL.glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 }
-
-void Renderer::bufferVertex(QVector3D _position, QRgba64 _color, QVector2D _texcoord)
+#else
+void Renderer::bindTexture(void *texture)
 {
-	mVertexBuffer.push_back(
-		RendererVertex {
-			{ _position.x(), _position.y(), _position.z(), 1.0f},
-			{ _color.red8() / float(UINT8_MAX), _color.green8() / float(UINT8_MAX), _color.blue8() / float(UINT8_MAX), _color.alpha8() / float(UINT8_MAX)},
-			{ _texcoord.x(), _texcoord.y() }
-		}
-	);
+	Q_UNUSED(texture)
+	// No-op for non-OpenGL builds
 }
+#endif
+
+void Renderer::bufferVertex(QVector3D _position, QRgba64 _color,
+                            QVector2D _texcoord)
+{
+	mVertexBuffer.push_back(RendererVertex{
+	    { _position.x(), _position.y(), _position.z(), 1.0f },
+	    { _color.red8() / float(UINT8_MAX), _color.green8() / float(UINT8_MAX),
+	      _color.blue8() / float(UINT8_MAX),
+	      _color.alpha8() / float(UINT8_MAX) },
+	    { _texcoord.x(), _texcoord.y() } });
+	_buffersHaveChanged = true;
+}
+
+#ifndef NO_OPENGL_WIDGETS
 #ifdef QT_DEBUG
 void Renderer::messageLogged(const QOpenGLDebugMessage &msg)
 {
 	QString error;
 
 	// Format based on severity
-	switch (msg.severity())
-	{
+	switch (msg.severity()) {
 	case QOpenGLDebugMessage::NotificationSeverity:
 		error += "NOTIFICATION";
 		break;
@@ -352,37 +423,41 @@ void Renderer::messageLogged(const QOpenGLDebugMessage &msg)
 	error += "[";
 
 	// Format based on source
-#define CASE(c) case QOpenGLDebugMessage::c: error += #c; break
-	switch (msg.source())
-	{
-	CASE(APISource);
-	CASE(WindowSystemSource);
-	CASE(ShaderCompilerSource);
-	CASE(ThirdPartySource);
-	CASE(ApplicationSource);
-	CASE(OtherSource);
-	CASE(InvalidSource);
-	CASE(AnySource);
+#define CASE(c)                                                                \
+	case QOpenGLDebugMessage::c:                                               \
+		error += #c;                                                           \
+		break
+	switch (msg.source()) {
+		CASE(APISource);
+		CASE(WindowSystemSource);
+		CASE(ShaderCompilerSource);
+		CASE(ThirdPartySource);
+		CASE(ApplicationSource);
+		CASE(OtherSource);
+		CASE(InvalidSource);
+		CASE(AnySource);
 	}
 #undef CASE
 
 	error += "][";
 
 	// Format based on type
-#define CASE(c) case QOpenGLDebugMessage::c: error += #c; break
-	switch (msg.type())
-	{
-	CASE(ErrorType);
-	CASE(DeprecatedBehaviorType);
-	CASE(UndefinedBehaviorType);
-	CASE(PortabilityType);
-	CASE(PerformanceType);
-	CASE(OtherType);
-	CASE(MarkerType);
-	CASE(GroupPushType);
-	CASE(GroupPopType);
-	CASE(InvalidType);
-	CASE(AnyType);
+#define CASE(c)                                                                \
+	case QOpenGLDebugMessage::c:                                               \
+		error += #c;                                                           \
+		break
+	switch (msg.type()) {
+		CASE(ErrorType);
+		CASE(DeprecatedBehaviorType);
+		CASE(UndefinedBehaviorType);
+		CASE(PortabilityType);
+		CASE(PerformanceType);
+		CASE(OtherType);
+		CASE(MarkerType);
+		CASE(GroupPushType);
+		CASE(GroupPopType);
+		CASE(InvalidType);
+		CASE(AnyType);
 	}
 #undef CASE
 
@@ -390,4 +465,5 @@ void Renderer::messageLogged(const QOpenGLDebugMessage &msg)
 
 	qDebug() << qPrintable(error) << qPrintable(msg.message());
 }
+#endif
 #endif

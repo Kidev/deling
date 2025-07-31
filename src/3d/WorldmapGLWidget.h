@@ -18,14 +18,23 @@
 #pragma once
 
 #include <QtWidgets>
+
+#ifndef NO_OPENGL_WIDGETS
 #include <QOpenGLWidget>
 #include <QOpenGLTexture>
 #include <QOpenGLBuffer>
 #include <QOpenGLShaderProgram>
+#include <QOpenGLFunctions>
+#endif
+
 #include "game/worldmap/Map.h"
 #include "Renderer.h"
 
+#ifndef NO_OPENGL_WIDGETS
 class WorldmapGLWidget : public QOpenGLWidget, protected QOpenGLFunctions
+#else
+class WorldmapGLWidget : public QWidget
+#endif
 {
 	Q_OBJECT
 public:
@@ -34,54 +43,68 @@ public:
 
 	virtual ~WorldmapGLWidget();
 	void setMap(Map *map);
-	inline const Map *map() const {
+	inline const Map *map() const
+	{
 		return _map;
 	}
 	void setLimits(const QRect &rect);
 	// QImage toImage(int w, int h);
 	void setXTrans(float trans);
-	inline float xTrans() const {
+	inline float xTrans() const
+	{
 		return _xTrans;
 	}
 	void setYTrans(float trans);
-	inline float yTrans() const {
+	inline float yTrans() const
+	{
 		return _yTrans;
 	}
 	void setZTrans(float trans);
-	inline float zTrans() const {
+	inline float zTrans() const
+	{
 		return _distance;
 	}
 	void setXRot(float rot);
-	inline float xRot() const {
+	inline float xRot() const
+	{
 		return _xRot;
 	}
 	void setYRot(float rot);
-	inline float yRot() const {
+	inline float yRot() const
+	{
 		return _yRot;
 	}
 	void setZRot(float rot);
-	inline float zRot() const {
+	inline float zRot() const
+	{
 		return _zRot;
 	}
-	inline int texture() const {
+	inline int texture() const
+	{
 		return _texture;
 	}
-	inline int segmentGroupId() const {
+	inline int segmentGroupId() const
+	{
 		return _segmentGroupId;
 	}
-	inline int segmentId() const {
+	inline int segmentId() const
+	{
 		return _segmentId;
 	}
-	inline int blockId() const {
+	inline int blockId() const
+	{
 		return _blockId;
 	}
-	inline int polyId() const {
+	inline int polyId() const
+	{
 		return _polyId;
 	}
-	inline int clutId() const {
+	inline int clutId() const
+	{
 		return _clutId;
 	}
-	inline int groundType() const {
+	inline int groundType() const
+	{
 		return _groundType;
 	}
 	QRgb groundColor(quint8 groundType, quint8 region,
@@ -97,10 +120,16 @@ public slots:
 	void setClutId(int clutId);
 	void setSegmentFiltering(Map::SegmentFiltering filtering);
 	void dumpCurrent();
+
 protected:
+#ifndef NO_OPENGL_WIDGETS
 	virtual void initializeGL();
 	virtual void resizeGL(int w, int h);
 	virtual void paintGL();
+#else
+	virtual void paintEvent(QPaintEvent *event);
+	virtual void resizeEvent(QResizeEvent *event);
+#endif
 	virtual void wheelEvent(QWheelEvent *event);
 	virtual void mousePressEvent(QMouseEvent *event);
 	virtual void mouseMoveEvent(QMouseEvent *event);
@@ -108,6 +137,7 @@ protected:
 	virtual void keyPressEvent(QKeyEvent *event);
 	virtual void focusInEvent(QFocusEvent *event);
 	virtual void focusOutEvent(QFocusEvent *event);
+
 private:
 	void importVertices();
 
@@ -119,10 +149,16 @@ private:
 	int _groundType, _polyId, _clutId;
 	QRect _limits;
 	QPointF _moveStart;
+
+#ifndef NO_OPENGL_WIDGETS
 	QOpenGLTexture *_megaTexture;
 	QOpenGLBuffer buf;
 	QOpenGLShaderProgram *program;
-	Renderer *gpuRenderer;
 	QMatrix4x4 _matrixProj;
+#else
+	QImage _megaImage;
+#endif
+
+	Renderer *gpuRenderer;
 	Map::SegmentFiltering _segmentFiltering;
 };

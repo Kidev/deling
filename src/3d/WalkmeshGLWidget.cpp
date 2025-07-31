@@ -17,16 +17,29 @@
  ****************************************************************************/
 #include "WalkmeshGLWidget.h"
 
+#ifndef NO_OPENGL_WIDGETS
+#include <QPainter>
+#endif
+
 WalkmeshGLWidget::WalkmeshGLWidget(QWidget *parent)
-    : QOpenGLWidget(parent),
-      distance(0.0), xRot(0.0f), yRot(0.0f), zRot(0.0f),
-      xTrans(0.0f), yTrans(0.0f), transStep(360.0f), lastKeyPressed(-1),
-      camID(0), _selectedTriangle(-1), _selectedDoor(-1), _selectedGate(-1),
-      _lineToDrawPoint1(Vertex()), _lineToDrawPoint2(Vertex()),
-      fovy(70.0), data(nullptr), curFrame(0), gpuRenderer(nullptr), _drawLine(false),
+    :
+#ifndef NO_OPENGL_WIDGETS
+      QOpenGLWidget(parent),
+#else
+      QWidget(parent),
+#endif
+      distance(0.0), xRot(0.0f), yRot(0.0f), zRot(0.0f), xTrans(0.0f),
+      yTrans(0.0f), transStep(360.0f), lastKeyPressed(-1), camID(0),
+      _selectedTriangle(-1), _selectedDoor(-1), _selectedGate(-1),
+      _lineToDrawPoint1(Vertex()), _lineToDrawPoint2(Vertex()), fovy(70.0),
+      data(nullptr), curFrame(0), gpuRenderer(nullptr), _drawLine(false),
       _backgroundVisible(true)
 {
-	// setMouseTracking(true);
+	setMouseTracking(true);
+#ifdef NO_OPENGL_WIDGETS
+	// For non-OpenGL builds, we need keyboard focus
+	setFocusPolicy(Qt::StrongFocus);
+#endif
 	// startTimer(100);
 }
 
@@ -46,9 +59,9 @@ void WalkmeshGLWidget::clear()
 {
 	data = nullptr;
 	tex = QImage();
-	
+
 	update();
-	
+
 	if (gpuRenderer) {
 		gpuRenderer->reset();
 	}
@@ -64,11 +77,10 @@ void WalkmeshGLWidget::fill(Field *data)
 
 void WalkmeshGLWidget::computeFov()
 {
-	if (data && data->hasCaFile()
-			&& data->getCaFile()->cameraCount() > 0
-			&& camID < data->getCaFile()->cameraCount()) {
+	if (data && data->hasCaFile() && data->getCaFile()->cameraCount() > 0
+	    && camID < data->getCaFile()->cameraCount()) {
 		const Camera &cam = data->getCaFile()->camera(camID);
-		fovy = (2 * atan(240.0/(2.0 * cam.camera_zoom))) * 57.29577951;
+		fovy = (2 * atan(240.0 / (2.0 * cam.camera_zoom))) * 57.29577951;
 	} else {
 		fovy = 70.0;
 	}
@@ -77,12 +89,18 @@ void WalkmeshGLWidget::computeFov()
 void WalkmeshGLWidget::updatePerspective()
 {
 	computeFov();
+#ifndef NO_OPENGL_WIDGETS
 	resizeGL(width(), height());
+#else
+	resizeEvent(nullptr);
+#endif
 	update();
 }
 
+#ifndef NO_OPENGL_WIDGETS
 void WalkmeshGLWidget::initializeGL()
 {
+	initializeOpenGLFunctions();
 }
 
 void WalkmeshGLWidget::resizeGL(int width, int height)
@@ -113,7 +131,8 @@ void WalkmeshGLWidget::paintGL()
 	}
 
 	mProjection.setToIdentity();
-	mProjection.perspective(fovy, (float)width() / (float)height(), 0.001f, 1000.0f);
+	mProjection.perspective(fovy, (float)width() / (float)height(), 0.001f,
+	                        1000.0f);
 	gpuRenderer->bindProjectionMatrix(mProjection);
 
 	QMatrix4x4 mModel;
@@ -124,7 +143,8 @@ void WalkmeshGLWidget::paintGL()
 
 	QMatrix4x4 mView;
 
-	if (data->hasCaFile() && data->getCaFile()->cameraCount() > 0 && camID < data->getCaFile()->cameraCount()) {
+	if (data->hasCaFile() && data->getCaFile()->cameraCount() > 0
+	    && camID < data->getCaFile()->cameraCount()) {
 		const Camera &cam = data->getCaFile()->camera(camID);
 
 		double camAxisXx = cam.camera_axis[0].x / 4096.0;
@@ -143,11 +163,16 @@ void WalkmeshGLWidget::paintGL()
 		double camPosY = -cam.camera_position[1] / 4096.0;
 		double camPosZ = cam.camera_position[2] / 4096.0;
 
-		double tx = -(camPosX*camAxisXx + camPosY*camAxisYx + camPosZ*camAxisZx);
-		double ty = -(camPosX*camAxisXy + camPosY*camAxisYy + camPosZ*camAxisZy);
-		double tz = -(camPosX*camAxisXz + camPosY*camAxisYz + camPosZ*camAxisZz);
+		double tx =
+		    -(camPosX * camAxisXx + camPosY * camAxisYx + camPosZ * camAxisZx);
+		double ty =
+		    -(camPosX * camAxisXy + camPosY * camAxisYy + camPosZ * camAxisZy);
+		double tz =
+		    -(camPosX * camAxisXz + camPosY * camAxisYz + camPosZ * camAxisZz);
 
-		const QVector3D eye(tx, ty, tz), center(tx + camAxisZx, ty + camAxisZy, tz + camAxisZz), up(camAxisYx, camAxisYy, camAxisYz);
+		const QVector3D eye(tx, ty, tz),
+		    center(tx + camAxisZx, ty + camAxisZy, tz + camAxisZz),
+		    up(camAxisYx, camAxisYy, camAxisYz);
 		mView.lookAt(eye, center, up);
 	}
 
@@ -155,18 +180,33 @@ void WalkmeshGLWidget::paintGL()
 	gpuRenderer->bindViewMatrix(mView);
 
 	if (data->hasIdFile()) {
-		int i=0;
+		int i = 0;
 
-		for (const Triangle &triangle: data->getIdFile()->getTriangles()) {
+		for (const Triangle &triangle : data->getIdFile()->getTriangles()) {
 			const Access &access = data->getIdFile()->access(i);
 
 			// Vertex info
-			QVector3D positionA(triangle.vertices[0].x / 4096.0, triangle.vertices[0].y / 4096.0, triangle.vertices[0].z / 4096.0),
-								positionB(triangle.vertices[1].x / 4096.0, triangle.vertices[1].y / 4096.0, triangle.vertices[1].z / 4096.0),
-								positionC(triangle.vertices[2].x / 4096.0, triangle.vertices[2].y / 4096.0, triangle.vertices[2].z / 4096.0);
-			QRgba64   color1 = QRgba64::fromArgb32((i == _selectedTriangle ? 0xFFFF9000 : (access.a[0] == -1 ? 0xFF6699CC : 0xFFFFFFFF))),
-								color2 = QRgba64::fromArgb32((i == _selectedTriangle ? 0xFFFF9000 : (access.a[1] == -1 ? 0xFF6699CC : 0xFFFFFFFF))),
-								color3 = QRgba64::fromArgb32((i == _selectedTriangle ? 0xFFFF9000 : (access.a[2] == -1 ? 0xFF6699CC : 0xFFFFFFFF)));
+			QVector3D positionA(triangle.vertices[0].x / 4096.0,
+			                    triangle.vertices[0].y / 4096.0,
+			                    triangle.vertices[0].z / 4096.0),
+			    positionB(triangle.vertices[1].x / 4096.0,
+			              triangle.vertices[1].y / 4096.0,
+			              triangle.vertices[1].z / 4096.0),
+			    positionC(triangle.vertices[2].x / 4096.0,
+			              triangle.vertices[2].y / 4096.0,
+			              triangle.vertices[2].z / 4096.0);
+			QRgba64 color1 = QRgba64::fromArgb32(
+			            (i == _selectedTriangle
+			                 ? 0xFFFF9000
+			                 : (access.a[0] == -1 ? 0xFF6699CC : 0xFFFFFFFF))),
+			        color2 = QRgba64::fromArgb32(
+			            (i == _selectedTriangle
+			                 ? 0xFFFF9000
+			                 : (access.a[1] == -1 ? 0xFF6699CC : 0xFFFFFFFF))),
+			        color3 = QRgba64::fromArgb32(
+			            (i == _selectedTriangle
+			                 ? 0xFFFF9000
+			                 : (access.a[2] == -1 ? 0xFF6699CC : 0xFFFFFFFF)));
 			QVector2D texcoord;
 
 			// Line
@@ -187,12 +227,16 @@ void WalkmeshGLWidget::paintGL()
 		if (!_drawLine && data->hasInfFile()) {
 			InfFile *inf = data->getInfFile();
 
-			for (const Gateway &gate: inf->getGateways()) {
+			for (const Gateway &gate : inf->getGateways()) {
 				if (gate.fieldId != 0x7FFF) {
 					// Vertex info
-					QVector3D positionA(gate.exitLine[0].x / 4096.0, gate.exitLine[0].y / 4096.0, gate.exitLine[0].z / 4096.0),
-										positionB(gate.exitLine[1].x / 4096.0, gate.exitLine[1].y / 4096.0, gate.exitLine[1].z / 4096.0);
-					QRgba64   color = QRgba64::fromArgb32(0xFFFF0000);
+					QVector3D positionA(gate.exitLine[0].x / 4096.0,
+					                    gate.exitLine[0].y / 4096.0,
+					                    gate.exitLine[0].z / 4096.0),
+					    positionB(gate.exitLine[1].x / 4096.0,
+					              gate.exitLine[1].y / 4096.0,
+					              gate.exitLine[1].z / 4096.0);
+					QRgba64 color = QRgba64::fromArgb32(0xFFFF0000);
 					QVector2D texcoord;
 
 					gpuRenderer->bufferVertex(positionA, color, texcoord);
@@ -200,12 +244,16 @@ void WalkmeshGLWidget::paintGL()
 				}
 			}
 
-			for (const Trigger &trigger: inf->getTriggers()) {
+			for (const Trigger &trigger : inf->getTriggers()) {
 				if (trigger.doorID != 0xFF) {
 					// Vertex info
-					QVector3D positionA(trigger.trigger_line[0].x / 4096.0, trigger.trigger_line[0].y / 4096.0, trigger.trigger_line[0].z / 4096.0),
-										positionB(trigger.trigger_line[1].x / 4096.0, trigger.trigger_line[1].y / 4096.0, trigger.trigger_line[1].z / 4096.0);
-					QRgba64   color = QRgba64::fromArgb32(0xFF00FF00);
+					QVector3D positionA(trigger.trigger_line[0].x / 4096.0,
+					                    trigger.trigger_line[0].y / 4096.0,
+					                    trigger.trigger_line[0].z / 4096.0),
+					    positionB(trigger.trigger_line[1].x / 4096.0,
+					              trigger.trigger_line[1].y / 4096.0,
+					              trigger.trigger_line[1].z / 4096.0);
+					QRgba64 color = QRgba64::fromArgb32(0xFF00FF00);
 					QVector2D texcoord;
 
 					gpuRenderer->bufferVertex(positionA, color, texcoord);
@@ -216,9 +264,13 @@ void WalkmeshGLWidget::paintGL()
 
 		if (_drawLine) {
 			// Vertex info
-			QVector3D positionA(_lineToDrawPoint1.x / 4096.0, _lineToDrawPoint1.y / 4096.0, _lineToDrawPoint1.z / 4096.0),
-								positionB(_lineToDrawPoint2.x / 4096.0, _lineToDrawPoint2.y / 4096.0, _lineToDrawPoint2.z / 4096.0);
-			QRgba64   color = QRgba64::fromArgb32(0xFFFF00FF);
+			QVector3D positionA(_lineToDrawPoint1.x / 4096.0,
+			                    _lineToDrawPoint1.y / 4096.0,
+			                    _lineToDrawPoint1.z / 4096.0),
+			    positionB(_lineToDrawPoint2.x / 4096.0,
+			              _lineToDrawPoint2.y / 4096.0,
+			              _lineToDrawPoint2.z / 4096.0);
+			QRgba64 color = QRgba64::fromArgb32(0xFFFF00FF);
 			QVector2D texcoord;
 
 			gpuRenderer->bufferVertex(positionA, color, texcoord);
@@ -227,14 +279,22 @@ void WalkmeshGLWidget::paintGL()
 
 		gpuRenderer->draw(RendererPrimitiveType::PT_LINES);
 
-		if (_selectedTriangle >= 0 && _selectedTriangle < data->getIdFile()->triangleCount()) {
-			const Triangle &triangle = data->getIdFile()->triangle(_selectedTriangle);
+		if (_selectedTriangle >= 0
+		    && _selectedTriangle < data->getIdFile()->triangleCount()) {
+			const Triangle &triangle =
+			    data->getIdFile()->triangle(_selectedTriangle);
 
 			// Vertex info
-			QVector3D positionA(triangle.vertices[0].x / 4096.0, triangle.vertices[0].y / 4096.0, triangle.vertices[0].z / 4096.0),
-								positionB(triangle.vertices[1].x / 4096.0, triangle.vertices[1].y / 4096.0, triangle.vertices[1].z / 4096.0),
-								positionC(triangle.vertices[2].x / 4096.0, triangle.vertices[2].y / 4096.0, triangle.vertices[2].z / 4096.0);
-			QRgba64   color = QRgba64::fromArgb32(0xFFFF9000);
+			QVector3D positionA(triangle.vertices[0].x / 4096.0,
+			                    triangle.vertices[0].y / 4096.0,
+			                    triangle.vertices[0].z / 4096.0),
+			    positionB(triangle.vertices[1].x / 4096.0,
+			              triangle.vertices[1].y / 4096.0,
+			              triangle.vertices[1].z / 4096.0),
+			    positionC(triangle.vertices[2].x / 4096.0,
+			              triangle.vertices[2].y / 4096.0,
+			              triangle.vertices[2].z / 4096.0);
+			QRgba64 color = QRgba64::fromArgb32(0xFFFF9000);
 			QVector2D texcoord;
 
 			// Line
@@ -245,12 +305,17 @@ void WalkmeshGLWidget::paintGL()
 
 		if (data->hasInfFile()) {
 			if (_selectedGate >= 0 && _selectedGate < 12) {
-				const Gateway &gate = data->getInfFile()->getGateway(_selectedGate);
+				const Gateway &gate =
+				    data->getInfFile()->getGateway(_selectedGate);
 				if (gate.fieldId != 0x7FFF) {
 					// Vertex info
-					QVector3D positionA(gate.exitLine[0].x / 4096.0, gate.exitLine[0].y / 4096.0, gate.exitLine[0].z / 4096.0),
-										positionB(gate.exitLine[1].x / 4096.0, gate.exitLine[1].y / 4096.0, gate.exitLine[1].z / 4096.0);
-					QRgba64   color = QRgba64::fromArgb32(0xFFFF0000);
+					QVector3D positionA(gate.exitLine[0].x / 4096.0,
+					                    gate.exitLine[0].y / 4096.0,
+					                    gate.exitLine[0].z / 4096.0),
+					    positionB(gate.exitLine[1].x / 4096.0,
+					              gate.exitLine[1].y / 4096.0,
+					              gate.exitLine[1].z / 4096.0);
+					QRgba64 color = QRgba64::fromArgb32(0xFFFF0000);
 					QVector2D texcoord;
 
 					gpuRenderer->bufferVertex(positionA, color, texcoord);
@@ -259,12 +324,17 @@ void WalkmeshGLWidget::paintGL()
 			}
 
 			if (_selectedDoor >= 0 && _selectedDoor < 12) {
-				const Trigger &trigger = data->getInfFile()->getTrigger(_selectedDoor);
+				const Trigger &trigger =
+				    data->getInfFile()->getTrigger(_selectedDoor);
 				if (trigger.doorID != 0xFF) {
 					// Vertex info
-					QVector3D positionA(trigger.trigger_line[0].x / 4096.0, trigger.trigger_line[0].y / 4096.0, trigger.trigger_line[0].z / 4096.0),
-										positionB(trigger.trigger_line[1].x / 4096.0, trigger.trigger_line[1].y / 4096.0, trigger.trigger_line[1].z / 4096.0);
-					QRgba64   color = QRgba64::fromArgb32(0xFF00FF00);
+					QVector3D positionA(trigger.trigger_line[0].x / 4096.0,
+					                    trigger.trigger_line[0].y / 4096.0,
+					                    trigger.trigger_line[0].z / 4096.0),
+					    positionB(trigger.trigger_line[1].x / 4096.0,
+					              trigger.trigger_line[1].y / 4096.0,
+					              trigger.trigger_line[1].z / 4096.0);
+					QRgba64 color = QRgba64::fromArgb32(0xFF00FF00);
 					QVector2D texcoord;
 
 					gpuRenderer->bufferVertex(positionA, color, texcoord);
@@ -279,35 +349,29 @@ void WalkmeshGLWidget::paintGL()
 
 void WalkmeshGLWidget::drawBackground()
 {
-	if (data->getBackgroundFile())
-	{
-		RendererVertex vertices[] = {
-		    {
-		        {-1.0f, -1.0f, 1.0f, 1.0f},
-		        {1.0f, 1.0f, 1.0f, 1.0f},
-		        {0.0f, 1.0f},
-		    },
-		    {
-		        {-1.0f, 1.0f, 1.0f, 1.0f},
-		        {1.0f, 1.0f, 1.0f, 1.0f},
-		        {0.0f, 0.0f},
-		    },
-		    {
-		        {1.0f, -1.0f, 1.0f, 1.0f},
-		        {1.0f, 1.0f, 1.0f, 1.0f},
-		        {1.0f, 1.0f},
-		    },
-		    {
-		        {1.0f, 1.0f, 1.0f, 1.0f},
-		        {1.0f, 1.0f, 1.0f, 1.0f},
-		        {1.0f, 0.0f},
-		    }
-		};
+	if (data->getBackgroundFile()) {
+		RendererVertex vertices[] = { {
+			                              { -1.0f, -1.0f, 1.0f, 1.0f },
+			                              { 1.0f, 1.0f, 1.0f, 1.0f },
+			                              { 0.0f, 1.0f },
+			                          },
+			                          {
+			                              { -1.0f, 1.0f, 1.0f, 1.0f },
+			                              { 1.0f, 1.0f, 1.0f, 1.0f },
+			                              { 0.0f, 0.0f },
+			                          },
+			                          {
+			                              { 1.0f, -1.0f, 1.0f, 1.0f },
+			                              { 1.0f, 1.0f, 1.0f, 1.0f },
+			                              { 1.0f, 1.0f },
+			                          },
+			                          {
+			                              { 1.0f, 1.0f, 1.0f, 1.0f },
+			                              { 1.0f, 1.0f, 1.0f, 1.0f },
+			                              { 1.0f, 0.0f },
+			                          } };
 
-		uint32_t indices[] = {
-		    0, 1, 2,
-		    1, 3, 2
-		};
+		uint32_t indices[] = { 0, 1, 2, 1, 3, 2 };
 
 		QMatrix4x4 mBG;
 
@@ -321,6 +385,57 @@ void WalkmeshGLWidget::drawBackground()
 		gpuRenderer->draw(RendererPrimitiveType::PT_TRIANGLES);
 	}
 }
+#else
+void WalkmeshGLWidget::resizeEvent(QResizeEvent *event)
+{
+	QWidget::resizeEvent(event);
+	update();
+}
+
+void WalkmeshGLWidget::paintEvent(QPaintEvent *event)
+{
+	QPainter painter(this);
+	painter.fillRect(rect(), Qt::black);
+
+	if (!data || tex.isNull()) {
+		painter.setPen(Qt::white);
+		painter.drawText(rect(), Qt::AlignCenter,
+		                 tr("OpenGL not available\nWalkmesh view disabled"));
+		return;
+	}
+
+	// Simple 2D fallback
+	QRect targetRect = rect();
+	QRect sourceRect = tex.rect();
+
+	// Apply basic zoom/pan transformation
+	float zoom = 1.0f + distance / 10.0f;
+	if (zoom < 0.1f)
+		zoom = 0.1f;
+	if (zoom > 10.0f)
+		zoom = 10.0f;
+
+	int w = int(targetRect.width() / zoom);
+	int h = int(targetRect.height() / zoom);
+	int x = int(xTrans * targetRect.width()) + (targetRect.width() - w) / 2;
+	int y = int(yTrans * targetRect.height()) + (targetRect.height() - h) / 2;
+
+	QRect scaledRect(x, y, w, h);
+
+	painter.setRenderHint(QPainter::SmoothPixmapTransform, false);
+	painter.drawImage(scaledRect, tex, sourceRect);
+
+	// Draw info overlay
+	painter.setPen(Qt::yellow);
+	painter.drawText(10, 20, tr("2D Fallback Mode (OpenGL disabled)"));
+	painter.drawText(10, 40, tr("Limited functionality available"));
+}
+
+void WalkmeshGLWidget::drawBackground()
+{
+	// No-op in fallback mode
+}
+#endif
 
 void WalkmeshGLWidget::wheelEvent(QWheelEvent *event)
 {
@@ -332,20 +447,17 @@ void WalkmeshGLWidget::wheelEvent(QWheelEvent *event)
 void WalkmeshGLWidget::mousePressEvent(QMouseEvent *event)
 {
 	setFocus();
-	if (event->button() == Qt::MiddleButton)
-	{
+	if (event->button() == Qt::MiddleButton) {
 		distance = -35;
 		update();
-	}
-	else if (event->button() == Qt::LeftButton)
-	{
+	} else if (event->button() == Qt::LeftButton) {
 		moveStart = event->pos();
 	}
 }
 
 void WalkmeshGLWidget::mouseMoveEvent(QMouseEvent *event)
 {
-	if (event->button() == Qt::LeftButton) {
+	if (event->buttons() & Qt::LeftButton) {
 		xTrans += (event->pos().x() - moveStart.x()) / 4096.0;
 		yTrans -= (event->pos().y() - moveStart.y()) / 4096.0;
 		moveStart = event->pos();
@@ -356,10 +468,8 @@ void WalkmeshGLWidget::mouseMoveEvent(QMouseEvent *event)
 void WalkmeshGLWidget::keyPressEvent(QKeyEvent *event)
 {
 	if (lastKeyPressed == event->key()
-			&& (event->key() == Qt::Key_Left
-				|| event->key() == Qt::Key_Right
-				|| event->key() == Qt::Key_Down
-				|| event->key() == Qt::Key_Up)) {
+	    && (event->key() == Qt::Key_Left || event->key() == Qt::Key_Right
+	        || event->key() == Qt::Key_Down || event->key() == Qt::Key_Up)) {
 		if (transStep > 100.0f) {
 			transStep *= 0.90f; // accelerator
 		}
@@ -368,22 +478,21 @@ void WalkmeshGLWidget::keyPressEvent(QKeyEvent *event)
 	}
 	lastKeyPressed = event->key();
 
-	switch (event->key())
-	{
+	switch (event->key()) {
 	case Qt::Key_Left:
-		xTrans += 1.0f/transStep;
+		xTrans += 1.0f / transStep;
 		update();
 		break;
 	case Qt::Key_Right:
-		xTrans -= 1.0f/transStep;
+		xTrans -= 1.0f / transStep;
 		update();
 		break;
 	case Qt::Key_Down:
-		yTrans += 1.0f/transStep;
+		yTrans += 1.0f / transStep;
 		update();
 		break;
 	case Qt::Key_Up:
-		yTrans -= 1.0f/transStep;
+		yTrans -= 1.0f / transStep;
 		update();
 		break;
 	default:
