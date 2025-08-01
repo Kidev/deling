@@ -66,5 +66,7 @@
         <file>shaders/main.frag</file>
         <file>shaders/vertex.glsl</file>
         <file>shaders/fragment.glsl</file>
+        <file>shaders/prebuilt/color.vert.qsb</file>
+        <file>shaders/prebuilt/color.frag.qsb</file>
     </qresource>
 </RCC>

@@ -2,7 +2,7 @@ name: CI/CD
 
 on:
   push:
-    branches: [ master ]
+    branches: [ master, qrhi_all ]
   pull_request:
     branches: [ master ]
   create: null
@@ -32,8 +32,9 @@ jobs:
           - Release
         include:
         - qt_tools: tools_ninja
-          qt_modules:
+          qt_modules: qtshadertools
           cmake_cli_arg: 'OFF'
+          use_rhi: true
         - os: ubuntu-latest
           package_extension: 'tar.xz'
           package_suffix: 'linux_x64'
@@ -49,13 +50,13 @@ jobs:
           package_suffix: 'win_x64'
           win_arch: "x64"
           qt_arch: win64_msvc2022_64
-          qt_tools: tools_ninja, tools_cmake
+          qt_tools: tools_ninja tools_cmake
         - os: windows-11-arm
           package_extension: 'zip'
           package_suffix: 'win_arm64'
           win_arch: "arm64"
           qt_arch: win64_msvc2022_arm64
-          qt_tools: tools_ninja, tools_cmake
+          qt_tools: tools_ninja tools_cmake
         - interface: gui
           cmake_cli_arg: 'OFF'
           cmake_gui_arg: 'ON'
@@ -160,7 +161,7 @@ jobs:
     - name: Build Deling
       id: main_build
       run: |
-        cmake -B ${{ env.deling_build_path }} --preset ${{ env.CMAKE_BUILD_TYPE }} -DCMAKE_INSTALL_PREFIX=${{ env.deling_installation_path }} -DCLI:BOOL=${{ matrix.cmake_cli_arg }} -DGUI:BOOL=${{ matrix.cmake_gui_arg }} -DPRERELEASE_STRING="$PRERELEASE_STRING" ${{ matrix.cmake_extra_args }}
+        cmake -B ${{ env.deling_build_path }} --preset ${{ env.CMAKE_BUILD_TYPE }} -DCMAKE_INSTALL_PREFIX=${{ env.deling_installation_path }} -DCLI:BOOL=${{ matrix.cmake_cli_arg }} -DGUI:BOOL=${{ matrix.cmake_gui_arg }} -DRHI:BOOL=${{ matrix.use_rhi }} -DPRERELEASE_STRING="$PRERELEASE_STRING" ${{ matrix.cmake_extra_args }}
         cmake --build ${{ env.deling_build_path }} --target package -j3
 
     - name: Upload vcpkg build logs
@@ -245,7 +246,7 @@ jobs:
 
     - name: Build
       run: |
-        cmake -S. -Bbuild --preset=Release -DCMAKE_INSTALL_PREFIX=/usr -DCPACK_DEBIAN_PACKAGE_RELEASE=${{github.run_attempt}}~${{matrix.config.name}}
+        cmake -S. -Bbuild --preset=Release -DRHI=OFF -DCMAKE_INSTALL_PREFIX=/usr -DCPACK_DEBIAN_PACKAGE_RELEASE=${{github.run_attempt}}~${{matrix.config.name}}
         cmake --build build
         cpack -G DEB -C Release --config build/CPackConfig.cmake
 

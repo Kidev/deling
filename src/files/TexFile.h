@@ -98,13 +98,13 @@ public:
 	TexFile(const TextureFile &textureFile, const TexStruct &header,
 			const QVector<quint8> &colorKeyArray=QVector<quint8>());
 	virtual bool open(const QByteArray &data);
-	virtual bool save(QByteArray &data);
+	virtual bool save(QByteArray &data) const;
 	TexFile scaled(const QSize &size) const;
 	void setVersion(Version version);
 	void debug();
 private:
-	void updateHeader();
-	TexStruct header;
+	void updateHeader() const;
+	mutable TexStruct header;
 	QVector<quint8> colorKeyArray;
 };
 
