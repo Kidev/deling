@@ -16,7 +16,7 @@
  ** along with this program.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 #include "widgets/JsmWidget.h"
-#include "3d/WalkmeshGLWidget.h"
+#include "3d/OpenGLRHIAdapter.h"
 #include "Config.h"
 #include "Data.h"
 
