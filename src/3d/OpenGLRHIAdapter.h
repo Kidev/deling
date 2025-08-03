@@ -1,6 +1,6 @@
 /****************************************************************************
- ** Deling Final Fantasy VIII Field Editor
- ** Copyright (C) 2009-2024 Arzel Jérôme <myst6re@gmail.com>
+ ** OpenGL to RHI Migration Adapter
+ ** Copyright (C) 2025 Alexandre 'kidev' Poumaroux
  **
  ** This program is free software: you can redistribute it and/or modify
  ** it under the terms of the GNU General Public License as published by
@@ -17,28 +17,27 @@
  ****************************************************************************/
 #pragma once
 
+#include <QtCore/qglobal.h>
 #include <QtWidgets>
-#include "3d/OpenGLRHIAdapter.h"
-#include "widgets/PageWidget.h"
+#include <QMatrix4x4>
 
-class WorldmapWidget : public PageWidget
-{
-	Q_OBJECT
-public:
-	explicit WorldmapWidget(QWidget *parent = nullptr);
-	inline WorldmapGLWidget *scene() const {
-		return _scene;
-	}
-	void fill() override;
-	inline QString tabName() const override { return tr("Worldmap"); }
-	void clear() override;
-private slots:
-	void setXRot(int value);
-	void setYRot(int value);
-	void setZRot(int value);
-	void resetCamera();
-private:
-	void build() override;
-	WorldmapGLWidget *_scene;
-	QSlider *_xRotSlider, *_yRotSlider, *_zRotSlider;
-};
+#ifdef USE_RHI
+
+#include "3d/WorldmapRHIWidget.h"
+#include "3d/WalkmeshRHIWidget.h"
+
+using WorldmapGLWidget = WorldmapRHIWidget;
+using WalkmeshGLWidget = WalkmeshRHIWidget;
+
+using GLfloat = float;
+using GLint = int;
+using GLuint = unsigned int;
+
+#else
+
+#include "3d/WorldmapGLWidget.h"
+#include "3d/WalkmeshGLWidget.h"
+#include <QOpenGLFunctions>
+#include <QOpenGLWidget>
+
+#endif

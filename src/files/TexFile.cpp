@@ -125,7 +125,7 @@ void TexFile::setVersion(Version version)
 	header.version = int(version);
 }
 
-void TexFile::updateHeader()
+void TexFile::updateHeader() const
 {
 	header.nbPalettes = _colorTables.size();
 	header.hasPal = !_colorTables.isEmpty();
@@ -134,7 +134,7 @@ void TexFile::updateHeader()
 	header.hasColorKeyArray = !colorKeyArray.isEmpty();
 }
 
-bool TexFile::save(QByteArray &data)
+bool TexFile::save(QByteArray &data) const
 {
 	updateHeader();
 	data.append((char *)&header, header.version==2 ? sizeof(TexStruct) : sizeof(TexStruct) - 4);

@@ -59,6 +59,7 @@ set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
 option(GUI "Build the gui executable" ON)
 option(CLI "Build the cli executable" OFF)
+option(RHI "Use Rhi instead of OpenGL" OFF)
 
 add_compile_definitions(
     QT_DISABLE_DEPRECATED_UP_TO=0x060000
@@ -74,7 +75,18 @@ add_compile_definitions(
     DELING_VERSION_TWEAK=0
 )
 
-find_package(Qt${QT_VERSION_MAJOR} COMPONENTS Widgets OpenGLWidgets OpenGL LinguistTools REQUIRED)
+if (RHI)
+    find_package(
+      Qt${QT_VERSION_MAJOR}
+      COMPONENTS Core ShaderTools Widgets Gui LinguistTools
+      REQUIRED)
+    add_compile_definitions(USE_RHI)
+else()
+    find_package(
+      Qt${QT_VERSION_MAJOR}
+      COMPONENTS Core Widgets OpenGLWidgets OpenGL LinguistTools Gui
+      REQUIRED)
+endif()
 find_package(ZLIB REQUIRED)
 find_package(lz4 CONFIG REQUIRED)
 
@@ -301,12 +313,24 @@ set(PROJECT_SOURCES
     "src/widgets/WalkmeshWidget.h"
     "src/widgets/WorldmapWidget.cpp"
     "src/widgets/WorldmapWidget.h"
-    "src/3d/Renderer.cpp"
     "src/3d/Renderer.h"
+)
+set(PROJECT_SOURCES_GL
     "src/3d/WalkmeshGLWidget.cpp"
     "src/3d/WalkmeshGLWidget.h"
     "src/3d/WorldmapGLWidget.cpp"
     "src/3d/WorldmapGLWidget.h"
+    "src/3d/RendererGL.cpp"
+    "src/3d/RendererGL.h"
+)
+set(PROJECT_SOURCES_RHI
+    "src/3d/WalkmeshRHIWidget.cpp"
+    "src/3d/WalkmeshRHIWidget.h"
+    "src/3d/WorldmapRHIWidget.cpp"
+    "src/3d/WorldmapRHIWidget.h"
+    "src/3d/OpenGLRHIAdapter.h"
+    "src/3d/RendererRHI.cpp"
+    "src/3d/RendererRHI.h"
 )
 
 if(APPLE)
@@ -460,6 +484,11 @@ set(PROJECT_CLI_SOURCES
     "src/Vertex.h"
 )
 
+if(RHI)
+  list(APPEND PROJECT_SOURCES ${PROJECT_SOURCES_RHI})
+else()
+  list(APPEND PROJECT_SOURCES ${PROJECT_SOURCES_GL})
+endif()
 set(RESOURCES "src/qt/${RELEASE_NAME}.qrc")
 
 if(APPLE)
@@ -477,13 +506,27 @@ endif()
 if(GUI)
 	qt_add_executable(${GUI_TARGET} MANUAL_FINALIZATION MACOSX_BUNDLE WIN32 ${PROJECT_SOURCES} ${QM_FILES} ${RESOURCES} ${EXTRA_RESOURCES_GUI})
 	target_include_directories(${GUI_TARGET} PRIVATE "${CMAKE_SOURCE_DIR}/src")
-	target_link_libraries(${GUI_TARGET} PRIVATE
-		Qt::OpenGL
-		Qt::Widgets
-		Qt::OpenGLWidgets
-		ZLIB::ZLIB
-		lz4::lz4
-	)
+    if(RHI)
+		target_link_libraries(${GUI_TARGET} PRIVATE
+            Qt6::Core
+            Qt6::Widgets
+            ZLIB::ZLIB
+            Qt6::Gui
+            lz4::lz4
+            Qt6::GuiPrivate
+            Qt6::ShaderTools
+            Qt6::ShaderToolsPrivate
+        )
+    else()
+		target_link_libraries(${GUI_TARGET} PRIVATE
+            Qt6::Core
+            Qt6::OpenGL
+            Qt6::Widgets
+            Qt6::OpenGLWidgets
+            ZLIB::ZLIB
+            lz4::lz4
+        )
+    endif()
 
 	if(${QT_VERSION_MAJOR} EQUAL 6)
 		target_compile_definitions(${GUI_TARGET}
