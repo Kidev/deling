@@ -1,6 +1,6 @@
 /****************************************************************************
- ** Deling Final Fantasy VIII Field Editor
- ** Copyright (C) 2009-2024 Arzel Jérôme <myst6re@gmail.com>
+ * * Deling QRhi port
+ ** Copyright (C) 2025 Alexandre 'kidev' Poumaroux <public@kidev.org>
  **
  ** This program is free software: you can redistribute it and/or modify
  ** it under the terms of the GNU General Public License as published by
@@ -15,35 +15,25 @@
  ** You should have received a copy of the GNU General Public License
  ** along with this program.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
+// WARNING: UNUSED IN PRACTICE, WORK IN PROGRESS, DO NOT OPEN MAPS
+
 #pragma once
 
-#ifdef USE_OPENGL
-#include "gl/WorldmapWidget.h"
-#else
+#include "WalkmeshRenderWidget.h"
 
-#include <QtWidgets>
-#include "widgets/WorldmapRenderWidget.h"
-#include "widgets/PageWidget.h"
-
-class WorldmapWidget : public PageWidget
+class WorldmapRenderWidget : public WalkmeshRenderWidget
 {
 	Q_OBJECT
 public:
-	explicit WorldmapWidget(QWidget *parent = nullptr);
-	inline WorldmapRenderWidget *scene() const {
-		return _scene;
-	}
-	void fill() override;
-	inline QString tabName() const override { return tr("Worldmap"); }
-	void clear() override;
-private slots:
-	void setXRot(int value);
-	void setYRot(int value);
-	void setZRot(int value);
-	void resetCamera();
-private:
-	void build() override;
-	WorldmapRenderWidget *_scene;
-	QSlider *_xRotSlider, *_yRotSlider, *_zRotSlider;
+	WorldmapRenderWidget(QWidget *parent = nullptr) : WalkmeshRenderWidget(parent) {}
+	void setMap(Map* map) {Q_UNUSED(map);}
+	void setXTrans(float value) {Q_UNUSED(value);}
+	void setYTrans(float value) {Q_UNUSED(value);}
+	void setZTrans(float value) {Q_UNUSED(value);}
+	void setXRot(float value) {Q_UNUSED(value);}
+	void setYRot(float value) {Q_UNUSED(value);}
+	void setZRot(float value) {Q_UNUSED(value);}
+	float xRot() const {return 0.0f;}
+	float yRot() const {return 0.0f;}
+	float zRot() const {return 0.0f;}
 };
-#endif

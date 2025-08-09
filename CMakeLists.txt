@@ -42,7 +42,7 @@ project("Deling" VERSION 1.0.0 LANGUAGES CXX
 include(qt.cmake)
 
 # specify the C++ standard
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 if (MSVC)
@@ -59,6 +59,14 @@ set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
 option(GUI "Build the gui executable" ON)
 option(CLI "Build the cli executable" OFF)
+option(RHI "Use Rhi instead of OpenGL" ON)
+
+# If ccache is found, use it
+find_program(CCACHE_FOUND ccache)
+if (CCACHE_FOUND)
+    set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE ccache)
+    message(STATUS "Using ccache")
+endif ()
 
 add_compile_definitions(
     QT_DISABLE_DEPRECATED_UP_TO=0x060000
@@ -74,7 +82,19 @@ add_compile_definitions(
     DELING_VERSION_TWEAK=0
 )
 
-find_package(Qt${QT_VERSION_MAJOR} COMPONENTS Widgets OpenGLWidgets OpenGL LinguistTools REQUIRED)
+if (RHI)
+    find_package(
+      Qt${QT_VERSION_MAJOR}
+      COMPONENTS Core ShaderTools Widgets Gui LinguistTools
+      REQUIRED)
+else()
+    message(STATUS "Will use legacy QOpenGLWidgets")
+    find_package(
+      Qt${QT_VERSION_MAJOR}
+      COMPONENTS Core Widgets OpenGLWidgets OpenGL LinguistTools Gui
+      REQUIRED)
+    add_compile_definitions(USE_OPENGL)
+endif()
 find_package(ZLIB REQUIRED)
 find_package(lz4 CONFIG REQUIRED)
 
@@ -297,17 +317,37 @@ set(PROJECT_SOURCES
     "src/widgets/TdwWidget.h"
     "src/widgets/TdwWidget2.cpp"
     "src/widgets/TdwWidget2.h"
-    "src/widgets/WalkmeshWidget.cpp"
-    "src/widgets/WalkmeshWidget.h"
-    "src/widgets/WorldmapWidget.cpp"
-    "src/widgets/WorldmapWidget.h"
-    "src/3d/Renderer.cpp"
-    "src/3d/Renderer.h"
+)
+set(PROJECT_SOURCES_WIDGETS_GL
+    "src/widgets/gl/WalkmeshWidget.cpp"
+    "src/widgets/gl/WalkmeshWidget.h"
+    "src/widgets/gl/WorldmapWidget.cpp"
+    "src/widgets/gl/WorldmapWidget.h"
     "src/3d/WalkmeshGLWidget.cpp"
     "src/3d/WalkmeshGLWidget.h"
     "src/3d/WorldmapGLWidget.cpp"
     "src/3d/WorldmapGLWidget.h"
+    "src/3d/Renderer.cpp"
+    "src/3d/Renderer.h"
 )
+set(PROJECT_SOURCES_WIDGETS
+    "src/widgets/WalkmeshWidget.cpp"
+    "src/widgets/WorldmapWidget.cpp"
+    "src/widgets/WalkmeshRenderWidget.cpp"
+    "src/widgets/WalkmeshRenderWidget.h"
+    "src/widgets/WorldmapRenderWidget.cpp"
+    "src/widgets/WorldmapRenderWidget.h"
+)
+
+set(PROJECT_SOURCES_SHADERS
+    "src/qt/shaders/walkmesh.vert"
+    "src/qt/shaders/walkmesh.frag"
+    "src/qt/shaders/background.vert"
+    "src/qt/shaders/background.frag"
+    "src/qt/shaders/worldmap.vert"
+    "src/qt/shaders/worldmap.frag"
+)
+
 
 if(APPLE)
     list(APPEND PROJECT_SOURCES
@@ -460,6 +500,11 @@ set(PROJECT_CLI_SOURCES
     "src/Vertex.h"
 )
 
+if(RHI)
+    list(APPEND PROJECT_SOURCES ${PROJECT_SOURCES_WIDGETS})
+else()
+    list(APPEND PROJECT_SOURCES ${PROJECT_SOURCES_WIDGETS_GL})
+endif()
 set(RESOURCES "src/qt/${RELEASE_NAME}.qrc")
 
 if(APPLE)
@@ -475,15 +520,32 @@ elseif (WIN32)
 endif()
 
 if(GUI)
-	qt_add_executable(${GUI_TARGET} MANUAL_FINALIZATION MACOSX_BUNDLE WIN32 ${PROJECT_SOURCES} ${QM_FILES} ${RESOURCES} ${EXTRA_RESOURCES_GUI})
-	target_include_directories(${GUI_TARGET} PRIVATE "${CMAKE_SOURCE_DIR}/src")
-	target_link_libraries(${GUI_TARGET} PRIVATE
-		Qt::OpenGL
-		Qt::Widgets
-		Qt::OpenGLWidgets
-		ZLIB::ZLIB
-		lz4::lz4
-	)
+    qt_add_executable(${GUI_TARGET} MANUAL_FINALIZATION MACOSX_BUNDLE WIN32 ${PROJECT_SOURCES} ${QM_FILES} ${RESOURCES} ${EXTRA_RESOURCES_GUI})
+    target_include_directories(${GUI_TARGET} PRIVATE "${CMAKE_SOURCE_DIR}/src")
+    if(RHI)
+        target_link_libraries(${GUI_TARGET} PRIVATE
+            Qt6::Core
+            Qt6::Widgets
+            ZLIB::ZLIB
+            Qt6::Gui
+            lz4::lz4
+            Qt6::GuiPrivate
+            Qt6::ShaderTools
+            Qt6::ShaderToolsPrivate
+        )
+        qt_add_shaders(${GUI_TARGET} "deling_shaders"
+            FILES ${PROJECT_SOURCES_SHADERS}
+        )
+    else()
+        target_link_libraries(${GUI_TARGET} PRIVATE
+            Qt6::Core
+            Qt6::OpenGL
+            Qt6::Widgets
+            Qt6::OpenGLWidgets
+            ZLIB::ZLIB
+            lz4::lz4
+        )
+    endif()
 
 	if(${QT_VERSION_MAJOR} EQUAL 6)
 		target_compile_definitions(${GUI_TARGET}

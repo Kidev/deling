@@ -63,6 +63,9 @@ int main(int argc, char *argv[])
 	format.setVersion(4, 1);
 #ifdef QT_DEBUG
 	format.setOption(QSurfaceFormat::DebugContext);
+	QLoggingCategory::setFilterRules("*.debug=true\n"
+	                                 "qt.rhi.general=true");
+
 #endif
 	QSurfaceFormat::setDefaultFormat(format);
 

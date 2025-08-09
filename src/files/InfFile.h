@@ -62,6 +62,12 @@ public:
 	inline QString filterText() const {
 		return QObject::tr("Field gate and doors PC File (*.inf)");
 	}
+	inline int gatewayCount() const {
+		return this->getGateways().count();
+	}
+	inline int triggerCount(bool filter = true) const {
+		return this->getTriggers(filter).count();
+	}
     QString getMapName() const;
 	void setMapName(const QString &mapName);
 	quint8 controlDirection() const;

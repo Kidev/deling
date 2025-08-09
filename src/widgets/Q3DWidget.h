@@ -2,7 +2,6 @@
 #define Q3DWIDGET_H
 
 #include <QWidget>
-#include <QtGui/private/qrhi_p.h>
 
 class Q3DWidget : public QWidget
 {

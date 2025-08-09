@@ -23,7 +23,7 @@
 WalkmeshWidget::WalkmeshWidget(QWidget *parent) :
 	PageWidget(parent)
 {
-	walkmeshGL = new WalkmeshGLWidget(this);
+	walkmeshRenderer = new WalkmeshRenderWidget(this);
 }
 
 void WalkmeshWidget::build()
@@ -62,7 +62,7 @@ void WalkmeshWidget::build()
 	tabWidget->setFixedHeight(250);
 
 	QGridLayout *layout = new QGridLayout(this);
-	layout->addWidget(walkmeshGL, 0, 0, 4, 1);
+	layout->addWidget(walkmeshRenderer, 0, 0, 4, 1);
 	layout->addWidget(slider1, 0, 1, Qt::AlignLeft);
 	layout->addWidget(slider2, 0, 2, Qt::AlignHCenter);
 	layout->addWidget(slider3, 0, 3, Qt::AlignRight);
@@ -73,11 +73,12 @@ void WalkmeshWidget::build()
 	layout->setColumnStretch(0, 1);
 	layout->setContentsMargins(QMargins());
 
-	connect(slider1, SIGNAL(valueChanged(int)), walkmeshGL, SLOT(setXRotation(int)));
-	connect(slider2, SIGNAL(valueChanged(int)), walkmeshGL, SLOT(setYRotation(int)));
-	connect(slider3, SIGNAL(valueChanged(int)), walkmeshGL, SLOT(setZRotation(int)));
-	connect(resetCamera, SIGNAL(clicked()), SLOT(resetCamera()));
-	connect(showBackground, SIGNAL(toggled(bool)), walkmeshGL, SLOT(setBackgroundVisible(bool)));
+	connect(slider1, &QSlider::valueChanged, walkmeshRenderer, &WalkmeshRenderWidget::setXRotation);
+	connect(slider2, &QSlider::valueChanged, walkmeshRenderer, &WalkmeshRenderWidget::setYRotation);
+	connect(slider3, &QSlider::valueChanged, walkmeshRenderer, &WalkmeshRenderWidget::setZRotation);
+	connect(resetCamera, &QPushButton::clicked, walkmeshRenderer, &WalkmeshRenderWidget::resetCamera);
+	connect(showBackground, &QCheckBox::toggled, walkmeshRenderer, &WalkmeshRenderWidget::setBackgroundVisible);
+	connect(tabWidget, &QTabWidget::currentChanged, walkmeshRenderer, &WalkmeshRenderWidget::setCurrentTabIndex);
 
 	PageWidget::build();
 }
@@ -93,7 +94,7 @@ void WalkmeshWidget::resetCamera()
 	slider1->blockSignals(false);
 	slider2->blockSignals(false);
 	slider3->blockSignals(false);
-	walkmeshGL->resetCamera();
+	walkmeshRenderer->resetCamera();
 }
 
 QWidget *WalkmeshWidget::buildCameraPage()
@@ -435,7 +436,7 @@ void WalkmeshWidget::clear()
 {
 	if (!isFilled())		return;
 
-	walkmeshGL->clear();
+	walkmeshRenderer->clear();
 
 	blockSignals(true);
 	camList->clear();
@@ -506,7 +507,7 @@ void WalkmeshWidget::fill()
 			 && !data()->hasIdFile()
 			 && !data()->hasInfFile())) return;
 
-	walkmeshGL->fill(data());
+	walkmeshRenderer->fill(data());
 
 	int camCount = 0;
 
@@ -629,7 +630,7 @@ void WalkmeshWidget::setCurrentCamera(int camID)
 
 		caZoomEdit->setValue(cam.camera_zoom);
 
-		walkmeshGL->setCurrentFieldCamera(camID);
+		walkmeshRenderer->setCurrentFieldCamera(camID);
 		blockSignals(false);
 	}
 
@@ -709,7 +710,7 @@ void WalkmeshWidget::editCaVector(int id, const Vertex &values)
 		if (oldV.x != values.x || oldV.y != values.y || oldV.z != values.z) {
 			cam.camera_axis[id] = values;
 			data()->getCaFile()->setCamera(camID, cam);
-			walkmeshGL->update();
+			walkmeshRenderer->update();
 			emit modified();
 		}
 	}
@@ -732,7 +733,7 @@ void WalkmeshWidget::editCaPos(int id, double value)
 		if (cam.camera_position[id] != (qint32)value) {
 			cam.camera_position[id] = value;
 			data()->getCaFile()->setCamera(camID, cam);
-			walkmeshGL->update();
+			walkmeshRenderer->update();
 			emit modified();
 		}
 	}
@@ -746,7 +747,7 @@ void WalkmeshWidget::editCaZoom(int value)
 		if (cam.camera_zoom != value) {
 			cam.camera_zoom = value;
 			data()->getCaFile()->setCamera(camID, cam);
-			walkmeshGL->updatePerspective();
+			walkmeshRenderer->updatePerspective();
 			emit modified();
 		}
 	}
@@ -770,7 +771,7 @@ void WalkmeshWidget::setCurrentId(int i)
 	idAccess[1]->setValue(access.a[1]);
 	idAccess[2]->setValue(access.a[2]);
 
-	walkmeshGL->setSelectedTriangle(i);
+	walkmeshRenderer->setSelectedTriangle(i);
 }
 
 void WalkmeshWidget::addTriangle()
@@ -833,7 +834,7 @@ void WalkmeshWidget::editIdTriangle(int id, const Vertex &values)
 			if (oldV.x != values.x || oldV.y != values.y || oldV.z != values.z) {
 				oldV = IdFile::fromVertex_s(values);
 				data()->getIdFile()->setTriangle(triangleID, old);
-				walkmeshGL->update();
+				walkmeshRenderer->update();
 				emit modified();
 			}
 		}
@@ -859,7 +860,7 @@ void WalkmeshWidget::editIdAccess(int id, int value)
 			if (oldV != value) {
 				old.a[id] = value;
 				data()->getIdFile()->setAccess(triangleID, old);
-				walkmeshGL->update();
+				walkmeshRenderer->update();
 				emit modified();
 			}
 		}
@@ -886,7 +887,7 @@ void WalkmeshWidget::setCurrentGateway(int id)
 
 	unknownGate2->setData(QByteArray((char *)&gateway.unknown2, 4));
 
-	walkmeshGL->setSelectedGate(id);
+	walkmeshRenderer->setSelectedGate(id);
 }
 
 void WalkmeshWidget::setCurrentDoor(int id)
@@ -909,7 +910,7 @@ void WalkmeshWidget::setCurrentDoor(int id)
 		doorId->setEnabled(true);
 		doorUsed->setChecked(true);
 	}
-	walkmeshGL->setSelectedDoor(id);
+	walkmeshRenderer->setSelectedDoor(id);
 }
 
 void WalkmeshWidget::editExitPoint(const Vertex &values)
@@ -929,7 +930,7 @@ void WalkmeshWidget::editExitPoint(int id, const Vertex &values)
 		if (oldVertex.x != values.x || oldVertex.y != values.y || oldVertex.z != values.z) {
 			old.exitLine[id] = values;
 			data()->getInfFile()->setGateway(gateId, old);
-			walkmeshGL->update();
+			walkmeshRenderer->update();
 			emit modified();
 		}
 	}
@@ -966,7 +967,7 @@ void WalkmeshWidget::editDoorPoint(int id, const Vertex &values)
 		if (oldVertex.x != values.x || oldVertex.y != values.y || oldVertex.z != values.z) {
 			old.trigger_line[id] = values;
 			data()->getInfFile()->setTrigger(gateId, old);
-			walkmeshGL->update();
+			walkmeshRenderer->update();
 			emit modified();
 		}
 	}
@@ -1050,7 +1051,7 @@ void WalkmeshWidget::editDoorId(int v)
 				doorList->currentItem()->setText(tr("Unused"));
 			}
 
-			walkmeshGL->update();
+			walkmeshRenderer->update();
 			emit modified();
 		}
 	}
@@ -1261,12 +1262,12 @@ void WalkmeshWidget::editCameraFocus(int value)
 
 void WalkmeshWidget::focusInEvent(QFocusEvent *e)
 {
-	if (isBuilded())	walkmeshGL->setFocus();
+	if (isBuilded())	walkmeshRenderer->setFocus();
 	QWidget::focusInEvent(e);
 }
 
 void WalkmeshWidget::focusOutEvent(QFocusEvent *e)
 {
-	if (isBuilded())	walkmeshGL->clearFocus();
+	if (isBuilded())	walkmeshRenderer->clearFocus();
 	QWidget::focusOutEvent(e);
 }

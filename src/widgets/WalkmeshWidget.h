@@ -17,9 +17,13 @@
  ****************************************************************************/
 #pragma once
 
+#ifdef USE_OPENGL
+#include "gl/WalkmeshWidget.h"
+#else
+
 #include <QtWidgets>
+#include "widgets/WalkmeshRenderWidget.h"
 #include "widgets/PageWidget.h"
-#include "3d/WalkmeshGLWidget.h"
 #include "VertexWidget.h"
 #include "OrientationWidget.h"
 #include "HexLineEdit.h"
@@ -90,7 +94,7 @@ private:
 	void editRange2(int id, int v);
 	void editUnknownGate(int id, int val);
 
-	WalkmeshGLWidget *walkmeshGL;
+	WalkmeshRenderWidget *walkmeshRenderer;
 	QCheckBox *showBackground;
 	QSlider *slider1, *slider2, *slider3;
 	QTabWidget *tabWidget;
@@ -129,3 +133,5 @@ private:
 	HexLineEdit *unknown;
 	QSpinBox *cameraFocus;
 };
+
+#endif

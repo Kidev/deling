@@ -15,7 +15,6 @@
  ** You should have received a copy of the GNU General Public License
  ** along with this program.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
-
 #include "WorldmapWidget.h"
 #include "Field.h"
 
@@ -30,7 +29,7 @@ void WorldmapWidget::build()
 		return;
 	}
 	
-	_scene = new WorldmapRenderWidget(this);
+	_scene = new WorldmapGLWidget(this);
 	const int minRot = -360, maxRot = 360;
 	
 	_xRotSlider = new QSlider(Qt::Vertical, this);
