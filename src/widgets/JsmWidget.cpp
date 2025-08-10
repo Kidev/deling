@@ -16,7 +16,11 @@
  ** along with this program.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 #include "widgets/JsmWidget.h"
+#ifdef USE_OPENGL
 #include "3d/WalkmeshGLWidget.h"
+#else
+#include "WalkmeshRenderWidget.h"
+#endif
 #include "Config.h"
 #include "Data.h"
 
@@ -391,7 +395,12 @@ void JsmWidget::showPreview(const QString &line, QPoint cursorPos)
 		vertex[1].y = qint16(texts.at(5).toInt());
 		vertex[1].z = qint16(texts.at(6).toInt());
 
+#ifdef USE_OPENGL
 		WalkmeshGLWidget walkmeshWidget;
+#else
+		WalkmeshRenderWidget walkmeshWidget;
+#endif
+
 		walkmeshWidget.hide();
 		walkmeshWidget.fill(data());
 		walkmeshWidget.setLineToDraw(vertex);

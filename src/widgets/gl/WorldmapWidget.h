@@ -17,12 +17,8 @@
  ****************************************************************************/
 #pragma once
 
-#ifdef USE_OPENGL
-#include "gl/WorldmapWidget.h"
-#else
-
 #include <QtWidgets>
-#include "widgets/WorldmapRenderWidget.h"
+#include "3d/WorldmapGLWidget.h"
 #include "widgets/PageWidget.h"
 
 class WorldmapWidget : public PageWidget
@@ -30,7 +26,7 @@ class WorldmapWidget : public PageWidget
 	Q_OBJECT
 public:
 	explicit WorldmapWidget(QWidget *parent = nullptr);
-	inline WorldmapRenderWidget *scene() const {
+	inline WorldmapGLWidget *scene() const {
 		return _scene;
 	}
 	void fill() override;
@@ -43,7 +39,6 @@ private slots:
 	void resetCamera();
 private:
 	void build() override;
-	WorldmapRenderWidget *_scene;
+	WorldmapGLWidget *_scene;
 	QSlider *_xRotSlider, *_yRotSlider, *_zRotSlider;
 };
-#endif
