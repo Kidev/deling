@@ -28,16 +28,16 @@ jobs:
         interface:
           - cli
           - gui
-        build_type:
-          - Release
         include:
         - qt_tools: tools_ninja
           qt_modules: qtshadertools
           cmake_cli_arg: 'OFF'
           use_rhi: true
+          build_type: 'Release'
         - os: ubuntu-latest
           package_extension: 'tar.xz'
           package_suffix: 'linux_x64'
+          build_type: 'Debug'
         - os: ubuntu-24.04-arm
           package_extension: 'tar.xz'
           package_suffix: 'linux_arm64'
@@ -51,6 +51,7 @@ jobs:
           win_arch: "x64"
           qt_arch: win64_msvc2022_64
           qt_tools: tools_ninja tools_cmake
+          build_type: 'Debug'
         - os: windows-11-arm
           package_extension: 'zip'
           package_suffix: 'win_arm64'
@@ -161,7 +162,7 @@ jobs:
         mv linuxdeploy-plugin-qt-*.AppImage $QT_ROOT_DIR/bin/linuxdeploy-plugin-qt
         mv linuxdeploy-*.AppImage $QT_ROOT_DIR/bin/linuxdeploy
 
-    - name: Build Deling
+    - name: Build Deling (${{ matrix.build_type }})
       id: main_build
       run: |
         cmake -B ${{ env.deling_build_path }} --preset ${{ env.CMAKE_BUILD_TYPE }} -DCMAKE_INSTALL_PREFIX=${{ env.deling_installation_path }} -DCLI:BOOL=${{ matrix.cmake_cli_arg }} -DGUI:BOOL=${{ matrix.cmake_gui_arg }} -DRHI:BOOL=${{ matrix.use_rhi }} -DPRERELEASE_STRING="$PRERELEASE_STRING" ${{ matrix.cmake_extra_args }}

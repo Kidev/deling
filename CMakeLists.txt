@@ -524,24 +524,24 @@ if(GUI)
     target_include_directories(${GUI_TARGET} PRIVATE "${CMAKE_SOURCE_DIR}/src")
     if(RHI)
         target_link_libraries(${GUI_TARGET} PRIVATE
-            Qt6::Core
-            Qt6::Widgets
+            Qt${QT_VERSION_MAJOR}::Core
+            Qt${QT_VERSION_MAJOR}::Widgets
             ZLIB::ZLIB
-            Qt6::Gui
+            Qt${QT_VERSION_MAJOR}::Gui
             lz4::lz4
-            Qt6::GuiPrivate
-            Qt6::ShaderTools
-            Qt6::ShaderToolsPrivate
+            Qt${QT_VERSION_MAJOR}::GuiPrivate
+            Qt${QT_VERSION_MAJOR}::ShaderTools
+            Qt${QT_VERSION_MAJOR}::ShaderToolsPrivate
         )
         qt_add_shaders(${GUI_TARGET} "deling_shaders"
             FILES ${PROJECT_SOURCES_SHADERS}
         )
     else()
         target_link_libraries(${GUI_TARGET} PRIVATE
-            Qt6::Core
-            Qt6::OpenGL
-            Qt6::Widgets
-            Qt6::OpenGLWidgets
+            Qt${QT_VERSION_MAJOR}::Core
+            Qt${QT_VERSION_MAJOR}::OpenGL
+            Qt${QT_VERSION_MAJOR}::Widgets
+            Qt${QT_VERSION_MAJOR}::OpenGLWidgets
             ZLIB::ZLIB
             lz4::lz4
         )
@@ -583,7 +583,7 @@ if(CLI)
     qt_add_executable(${CLI_TARGET} MANUAL_FINALIZATION ${PROJECT_CLI_SOURCES} ${RESOURCES} ${EXTRA_RESOURCES_CLI})
     target_include_directories(${CLI_TARGET} PRIVATE "${CMAKE_SOURCE_DIR}/src")
     target_link_libraries(${CLI_TARGET} PRIVATE
-        Qt::Gui
+        Qt${QT_VERSION_MAJOR}::Gui
         ZLIB::ZLIB
         lz4::lz4
     )
